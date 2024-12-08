@@ -1,22 +1,22 @@
-# Purpose -
-# Running this file (stand alone) - For extracting all the features from a web page for testing.
-# Notes -
-# 1 stands for legitimate
-# 0 stands for suspicious
-# -1 stands for phishing
-
-from bs4 import BeautifulSoup # BeautifulSoup is used to parse the HTML content of the web page.
-import requests  # requests is used to make HTTP requests
-import whois # whois is used to get the registration information of the web page.
-import re # re is used to search for patterns in the URL.
-import socket # socket is used for DNS lookups.
-import time # time is used to get the current date and time.
-from datetime import datetime # datetime is used to handle dates.
-from googlesearch import search # search is used to check if URL is indexed by Google.
-import urllib.parse # urllib.parse is used to parse URLs.
-from patterns import * # patterns contains regex patterns for URL analysis.
-import pandas as pd
+import re
+import ssl
+import socket
+import requests
+import whois
+import urllib.parse
 import os
+import pandas as pd
+from datetime import datetime
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
+from ipwhois import IPWhois
+from googlesearch import search
+from patterns import * 
+
+# Tắt cảnh báo SSL
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 # This import is needed only when you run this file in isolation.
 import sys
@@ -24,10 +24,6 @@ import sys
 # Path of your local server. Different for different OSs.
 LOCALHOST_PATH = "./"
 DIRECTORY_NAME = ""
-
-# Tắt cảnh báo InsecureRequestWarning
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # This function checks if the URL has an IP address.
 def having_ip_address(url):
@@ -840,6 +836,72 @@ def links_pointing(soup, domain):
         print(f"Error in links_pointing: {str(e)}")
         return -1  # Return phishing nếu có lỗi
 
+def check_ssl_certificate(url):
+    """Kiểm tra chi tiết về chứng chỉ SSL"""
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme != 'https':
+            return -1  # Phishing: Không sử dụng HTTPS
+        
+        # Tạo context SSL với verify mode
+        context = ssl.create_default_context()
+        context.check_hostname = True
+        context.verify_mode = ssl.CERT_REQUIRED
+        
+        # Lấy chứng chỉ từ server
+        with socket.create_connection((parsed.netloc, 443)) as sock:
+            with context.wrap_socket(sock, server_hostname=parsed.netloc) as ssock:
+                cert = ssock.getpeercert()
+                
+                # Kiểm tra thời gian chứng chỉ
+                not_after = ssl.cert_time_to_seconds(cert['notAfter'])
+                not_before = ssl.cert_time_to_seconds(cert['notBefore'])
+                cert_age = (not_after - not_before) / (365 * 24 * 60 * 60)  # Convert to years
+                
+                # Kiểm tra nhà phát hành
+                issuer = cert.get('issuer', [])
+                issuer_org = None
+                for item in issuer:
+                    if item[0][0] == 'organizationName':
+                        issuer_org = item[0][1]
+
+                trusted_issuers = [
+                    # Global CAs
+                    "DigiCert Inc",
+                    "Google Trust Services",
+                    "Let's Encrypt",
+                    "GlobalSign",
+                    "Sectigo Limited",
+                    "Amazon Trust Services",
+                    "IdenTrust",
+                    "GoDaddy",
+                    "Entrust",
+                    "VeriSign",
+                    # Regional CAs
+                    "Comodo Security Solutions",
+                    "Network Solutions",
+                    "RapidSSL",
+                    "Thawte",
+                    "GeoTrust",
+                    "QuoVadis",
+                    "SSL.com",
+                    "Trustwave",
+                    "SECOM Trust Systems",
+                    "SwissSign AG"
+                ]
+                
+                # Nếu chứng chỉ hợp lệ hoặc được cấp bởi nhà phát hành đáng tin cậy
+                if cert_age >= 1 or issuer_org in trusted_issuers:
+                    return 1  # Legitimate
+                elif cert_age < 1 and issuer_org not in trusted_issuers:
+                    return 0  # Suspicious
+                else:
+                    return -1  # Phishing
+
+    except Exception as e:
+        print(f"Error checking SSL certificate: {str(e)}")
+        return -1  # Phishing: Lỗi kết nối hoặc không hợp lệ
+
 def main(url):
     try:
         response = requests.get(url, verify=False, timeout=10)
@@ -876,7 +938,7 @@ def main(url):
             dns = -1
 
         # 8. SSL final State
-        status.append(-1 if dns == -1 else domain_registration_length(domain))
+        status.append(-1 if dns == -1 else check_ssl_certificate(url))
         
         # 9. Domain Registration Length
         status.append(-1 if dns == -1 else domain_registration_length(domain))

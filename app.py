@@ -14,7 +14,7 @@ from ipwhois import IPWhois
     
 def get_screenshot(url):
     try:
-        client = Client('ai9CYMZbtEUX2g', 'i5s2qY79CBCXGQ')
+        client = Client('qIIcbKJyRMI51w', 'r0Tl7Edxj_E0hg')
         options = (TakeOptions.url(url)
             .format("png")
             .viewport_width(800)
