@@ -31,13 +31,6 @@ env/
 *.swp
 *.swo
 
-# Project specific
-*.log
-*.arff
-temp_screenshot.png
-dataset/
-classifier/*.pkl
-
 # OS specific
 .DS_Store
 Thumbs.db
