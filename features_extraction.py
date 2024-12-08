@@ -7,7 +7,6 @@ import urllib.parse
 import os
 import pandas as pd
 from datetime import datetime
-from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from ipwhois import IPWhois
 from googlesearch import search
