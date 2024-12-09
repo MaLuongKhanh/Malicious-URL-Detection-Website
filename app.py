@@ -192,10 +192,8 @@ def analyze_url(url):
         st.header("Final Result")
         if prediction == 1:
             st.success("✅ This URL appears to be SAFE")
-        elif prediction == -1:
+        else :
             st.error("⚠️ WARNING: This URL appears to be PHISHING")
-        else:
-            st.warning("⚠️ This URL appears to be SUSPICIOUS")
             
     except Exception as e:
         st.error(f"An error occurred while analyzing the URL: {str(e)}")
